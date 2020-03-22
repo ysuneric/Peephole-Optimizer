@@ -92,6 +92,129 @@ int simplify_goto_goto(CODE **c)
   }
   return 0;
 }
+
+/*  useless null replacements
+ *  aload i
+ *  dup
+ *  ifnull null_k
+ *  goto stop_l
+ *  null_k:
+ *  pop
+ *  ldc "null"
+ *  stop_l:
+ *
+ *  ----->
+ *
+ *  aload i
+ *
+ */
+
+/*
+ *  useless comparision
+ *  iload i
+ *  iconst_2
+ *  if_icmpeq true_21
+ *  iconst_0
+ *  goto stop_22
+ *  true_21:
+ *  iconst_1
+ *  stop_22:
+ *  ifeq else_19
+ *
+ *
+ *  ------>
+ *
+ *  iload i
+ *  iconst k
+ *  if_icmp true_21:
+ *  goto else19
+ *  true_21:
+ *
+ */
+
+/*
+ * Conversion extra nop line 793?
+ *  i2c
+ *  ireturn
+ *  nop
+ *  .end method
+ */
+
+/* unknown about the pop after the putfield
+ *  putfield Decoder/uti Llib/JoosBitwise;
+ *  pop
+ *  return
+ *  .end method
+ */
+
+/*
+ *  areturn
+ *  goto start_4
+ *
+ *  ------>
+ *
+ *  areturn
+ */
+
+/*
+ *  replace decrements with single line
+ *  iload_2
+ *  iconst_1
+ *  isub
+ *  dup
+ *  istore 6
+ */
+
+/* better memory from dup
+ * aload i
+ * aload i
+ *
+ * ----->
+ *
+ * aload i
+ * dup
+ *
+ */
+
+/*
+ * astore i
+ * astore i
+ *
+ * ---->
+ *
+ * astore i
+ */
+
+/*
+ * store i
+ * load i
+ *
+ * ---->
+ *
+ * dup
+ * store i
+ */
+
+/*
+ * load i
+ * store i
+ *
+ * ---->
+ *
+ * nothing
+ */
+
+/*
+ *  ldc a / load a
+ *  ldc b / load b
+ *  swap
+ *
+ *  ---->
+ *
+ *  ldc b / load b
+ *  ldc a / load a
+ */
+
 void init_patterns(void) {
 	ADD_PATTERN(simplify_multiplication_right);
 	ADD_PATTERN(simplify_astore);
