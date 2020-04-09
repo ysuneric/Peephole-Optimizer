@@ -93,34 +93,64 @@ int simplify_goto_goto(CODE **c)
   return 0;
 }
 
+/****************** GROUP CODE BELOW *********************/
+
 /*  useless null replacements
- *  aload i
- *  dup
- *  ifnull null_k
- *  goto stop_l
- *  null_k:
+
+ *  ifnull Label1 (unique?)
+ *  goto Label2
+ *  Label1:
  *  pop
- *  ldc "null"
- *  stop_l:
+ *  ldc "null" (string, may be an int)
+ *  Label2
  *
  *  ----->
  *
- *  aload i
+ *  ifnonnull L2
+ * pop
+ * ldc x        (Integer or string)
+ * L2:
  *
- */
+ *
+ *
+* ldc x
+* dup
+* ifnull L
+* --------->
+* ldc x
+*/
+
 int simplify_null_check(CODE **c){
-    int x,y,z,a,b;
-    char *str2[5];
-    if(is_aload(*c, &x) &&
+    int x,y,a,b; //labels
+    int z; //constant
+    char *str;
+    if( //string
+        is_ifnull(*c, &x) && uniquelabel(x) &&
+        is_goto(next(*c), &y) &&
+        is_label(next(next(*c)), &a) &&
+        is_pop(next(next(next(*c)))) &&
+        is_ldc_string(next(next(next(next(*c)))),&str) &&
+        is_label(next(next(next(next(next(*c))))), &b)){
+        if(y == b && x == a) return replace(c, 5, makeCODEifnonnull(y,makeCODEpop(makeCODEldc_string(str, makeCODElabel(y,NULL)))));
+    }
+    if( //int
+            is_ifnull(*c, &x) && uniquelabel(x) &&
+            is_goto(next(*c), &y) &&
+            is_label(next(next(*c)), &a) &&
+            is_pop(next(next(next(*c)))) &&
+            is_ldc_int(next(next(next(next(*c)))),&z) &&
+            is_label(next(next(next(next(next(*c))))), &b)){
+        if(y == b && x == a) return replace(c, 5, makeCODEifnonnull(y,makeCODEpop(makeCODEldc_int(z, makeCODElabel(y,NULL)))));
+    }
+    if(is_ldc_int(*c, &x) &&
         is_dup(next(*c)) &&
-        is_ifnull(next(next(*c)), &y) &&
-        is_goto(next(next(next(*c))), &z) &&
-        is_label(next(next(next(next(*c)))), &a) &&
-        is_pop(next(next(next(next(next(*c)))))) &&
-        is_ldc_string(next(next(next(next(next(next(*c)))))),str2) &&
-        is_label(next(next(next(next(next(next(next(*c))))))), &b)
-        ){
-        if(z == b && y == a) return replace_modified(c, 7, makeCODEaload(x, NULL));
+        is_ifnull(next(next(*c)), &a)){ //int
+        return replace(c, 3, makeCODEldc_int(x, NULL));
+    }
+    if(is_ldc_string(*c, &str) &&
+       is_dup(next(*c)) &&
+       is_ifnull(next(next(*c)), &a)){ //string
+        return replace(c, 3, makeCODEldc_string(str, NULL));
     }
     return 0;
 }
@@ -165,15 +195,9 @@ int simplify_if_else(CODE **c){
  *  .end method
  */
 
-/* unknown about the pop after the putfield
- *  putfield Decoder/uti Llib/JoosBitwise;
- *  pop
- *  return
- *  .end method
- */
 
 /*
- *  areturn
+ *  return
  *  goto start_4
  *
  *  ------>
@@ -187,8 +211,13 @@ int remove_extra_goto(CODE **c)
         is_goto(next(*c),&x)) {
         return replace_modified(c, 2, makeCODEareturn(NULL));
     }
+    if (is_ireturn(*c) &&
+        is_goto(next(*c),&x)) {
+        return replace_modified(c, 2, makeCODEireturn(NULL));
+    }
     return 0;
 }
+
 
 /*
  *  replace decrements with single line
@@ -462,6 +491,7 @@ int simplify_multiplication_left(CODE **c)
 
 int load_load_swap(CODE **c)
 { int x,y,a,b,i,j;
+    char *str1, *str2;
     if (is_ldc_int(*c,&x) &&
          is_ldc_int(next(*c),&y)  &&
          is_swap(next(next(*c)))){
@@ -471,7 +501,7 @@ int load_load_swap(CODE **c)
             return replace(c,3, makeCODEldc_int(y, makeCODEldc_int(x, NULL)));
         }
     }
-    else if (is_iload(*c,&a) &&
+    if (is_iload(*c,&a) &&
                 is_iload(next(*c),&b)  &&
                 is_swap(next(next(*c)))){
         if(a == b){
@@ -479,13 +509,23 @@ int load_load_swap(CODE **c)
         } else {
             return replace(c,3, makeCODEiload(b, makeCODEiload(a, NULL)));
         }
-    } else if(is_aload(*c,&i) &&
+    }
+    if(is_aload(*c,&i) &&
                 is_aload(next(*c),&j)  &&
                 is_swap(next(next(*c)))) {
         if(i == j){
             return replace(c,3, makeCODEaload(i, makeCODEdup(NULL)));
         } else {
             return replace(c,3, makeCODEaload(j, makeCODEaload(i, NULL)));
+        }
+    }
+    if (is_ldc_string(*c,&str1) &&
+        is_ldc_string(next(*c),&str2)  &&
+        is_swap(next(next(*c)))){
+        if(strcmp(str1, str2) == 0){
+            return replace(c,3, makeCODEldc_string(str1, makeCODEdup(NULL)));
+        } else {
+            return replace(c,3, makeCODEldc_string(str2, makeCODEldc_string(str1, NULL)));
         }
     }
     return 0;
