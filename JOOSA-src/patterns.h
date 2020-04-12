@@ -143,7 +143,7 @@ int simplify_null_check(CODE **c){
     int x,y,a,b;
     int z;
     char *str;
-    if( //string
+    if(
         is_ifnull(*c, &x) && uniquelabel(x) &&
         is_goto(next(*c), &y) &&
         is_label(next(next(*c)), &a) &&
@@ -152,7 +152,7 @@ int simplify_null_check(CODE **c){
         is_label(next(next(next(next(next(*c))))), &b)){
         if(y == b && x == a) return replace(c, 5, makeCODEifnonnull(y,makeCODEpop(makeCODEldc_string(str, makeCODElabel(y,NULL)))));
     }
-    if( //int
+    if(
             is_ifnull(*c, &x) && uniquelabel(x) &&
             is_goto(next(*c), &y) &&
             is_label(next(next(*c)), &a) &&
@@ -163,56 +163,88 @@ int simplify_null_check(CODE **c){
     }
     if(is_ldc_int(*c, &x) &&
         is_dup(next(*c)) &&
-        is_ifnull(next(next(*c)), &a)){ //int
+        is_ifnull(next(next(*c)), &a)){
         return replace(c, 3, makeCODEldc_int(x, NULL));
     }
     if(is_ldc_string(*c, &str) &&
        is_dup(next(*c)) &&
-       is_ifnull(next(next(*c)), &a)){ //string
+       is_ifnull(next(next(*c)), &a)){
         return replace(c, 3, makeCODEldc_string(str, NULL));
     }
     return 0;
 }
 
-/*
- *  useless comparision\
- *  if_icmpeq true_21
- *  iconst_0
- *  goto stop_22
- *  true_21:
- *  iconst_1
- *  stop_22:
- *  ifeq else_19
- *
- *
- *  ------>
- *
- *  if_icmp true_21:
- *  goto else19
- *  true_21:
- *
- */
-int simplify_if_else(CODE **c){
-    int x,y,z,a,b;
-    if(is_if_icmpeq(*c, &x) &&
-        is_goto(next(next(*c)),&y) &&
-            is_label(next(next(next(*c))),&z) &&
-            is_label(next(next(next(next(next(*c))))),&a) &&
-            is_ifeq(next(next(next(next(next(next(*c)))))), &b)){
-       return replace(c, 7, makeCODEif_icmpeq(x,
-                makeCODEgoto(b,
-                        makeCODElabel(x,NULL))));
+
+int simplify_useless_comparison(CODE **c){
+    int x,y,a,a1,b,b1,d;
+    int check = 0;
+    if(is_if_icmpeq(*c, &a)){
+        check = 1;
+    } else if(is_if_icmpne(*c, &a)){
+        check = 2;
+    } else if(is_if_icmplt(*c, &a)){
+        check = 3;
+    } else if(is_if_icmple(*c, &a)){
+        check = 4;
+    } else if(is_if_icmpgt(*c, &a)){
+        check = 5;
+    } else if(is_if_icmpge(*c, &a)){
+        check = 6;
+    } else if(is_ifeq(*c, &a)){
+        check = 7;
+    } else if(is_ifne(*c, &a)){
+        check = 8;
+    }
+
+    if(check != 0 &&
+        is_ldc_int(next(*c), &x) &&
+        is_goto(next(next(*c)),&b) &&
+        is_label(next(next(next(*c))),&a1) &&
+        is_ldc_int(next(next(next(next(*c)))), &y) &&
+        is_label(next(next(next(next(next(*c))))),&b1) &&
+        is_ifeq(next(next(next(next(next(next(*c)))))), &d) &&
+        (x == 0 && y == 1 && a == a1 && b == b1) &&
+        uniquelabel(a) && uniquelabel(b)){
+        switch (check){
+            case 1: return(replace(c, 7,makeCODEif_icmpne(d,NULL)));
+            case 2: return(replace(c, 7,makeCODEif_icmpeq(d,NULL)));
+            case 3: return(replace(c, 7,makeCODEif_icmpge(d,NULL)));
+            case 4: return(replace(c, 7,makeCODEif_icmpgt(d,NULL)));
+            case 5: return(replace(c, 7,makeCODEif_icmple(d,NULL)));
+            case 6: return(replace(c, 7,makeCODEif_icmplt(d,NULL)));
+            case 7: return(replace(c, 7,makeCODEifne(d,NULL)));
+            case 8: return(replace(c, 7,makeCODEifeq(d,NULL)));
+            default: return 0;
+        }
+
     }
     return 0;
 }
 
+
 /*
  * Conversion extra nop line 793?
- *  i2c
  *  ireturn
  *  nop
- *  .end method
+ *  ------>
+ *  ireturn
+ *
+ *  OR
+ *
+ *  return
+ *  nop
+ *  ----->
+ *  return
  */
+
+int remove_extra_nop(CODE **c)
+{ if ((is_ireturn(*c) || is_return(*c)) && is_nop(next(*c))) {
+        if(is_return(*c)) return replace(c, 2, makeCODEreturn(NULL));
+        else if(is_ireturn(*c)) return replace(c, 2, makeCODEireturn(NULL));
+    }
+
+    return 0;
+}
 
 
 /*
@@ -260,7 +292,7 @@ int negative_increment(CODE **c)
 }
 
 /* iload x
- * ldc k   (0<=k<=127)
+ * ldc k   (0<=k<=128)
  * isub
  * istore x
  * --------->
@@ -272,7 +304,7 @@ int positive_decrement(CODE **c)
         is_ldc_int(next(*c),&k) &&
         is_isub(next(next(*c))) &&
         is_istore(next(next(next(*c))),&y) &&
-        x==y && 0<=k && k<=127) {
+        x==y && 0<=k && k<=128) {
         return replace(c,4,makeCODEiinc(x,-k,NULL));
     }
     return 0;
@@ -435,6 +467,12 @@ int load_store(CODE **c)
  * ------>        ------>
  * iload x        iload x
  *
+ * ldc x        ildc x
+ * ldc 0          ldc 0
+ * iadd           isub
+ * ------>        ------>
+ * iload x        iload x
+ *
  *
  */
 
@@ -447,6 +485,47 @@ int simplify_add_sub_right(CODE **c)
 
         return 0;
     }
+    if (is_ldc_int(*c,&x) &&
+        is_ldc_int(next(*c),&k) &&
+        (is_iadd(next(next(*c))) || is_isub(next(next(*c))))) {
+        if (k==0) return replace(c,3,makeCODEldc_int(x, NULL));
+
+        return 0;
+    }
+    return 0;
+}
+
+/* ldc 0        ldc 0
+ * iload x          iload x
+ * iadd           isub
+ * ------>        ------>
+ * iload x        iload x
+ *
+ * ldc 0          ldc 0
+ * ldc x          ldc x
+ * iadd           isub
+ * ------>        ------>
+ * iload x        iload x
+ *
+ *
+ */
+
+int simplify_add_sub_left(CODE **c)
+{ int x,k;
+    if (is_ldc_int(*c,&x) &&
+        is_iload(next(*c),&k) &&
+        (is_iadd(next(next(*c))) || is_isub(next(next(*c))))) {
+        if (k==0) return replace(c,3,makeCODEiload(x, NULL));
+
+        return 0;
+    }
+    if (is_ldc_int(*c,&k) &&
+        is_ldc_int(next(*c),&x) &&
+        (is_iadd(next(next(*c))) || is_isub(next(next(*c))))) {
+        if (k==0) return replace(c,3,makeCODEldc_int(x, NULL));
+
+        return 0;
+    }
     return 0;
 }
 
@@ -456,6 +535,11 @@ int simplify_add_sub_right(CODE **c)
  * ------>
  * iload x
  *
+ * ldc x
+ * ldc 1
+ * idiv
+ * ------>
+ * ldc x
  *
  */
 
@@ -465,9 +549,13 @@ int simplify_division_right(CODE **c)
         is_ldc_int(next(*c),&k) &&
         is_idiv(next(next(*c)))) {
         if (k==1) return replace(c,3,makeCODEiload(x,NULL));
-
-        return 0;
     }
+    if (is_ldc_int(*c,&x) &&
+        is_ldc_int(next(*c),&k) &&
+        is_idiv(next(next(*c)))) {
+        if (k==1) return replace(c,3,makeCODEldc_int(x,NULL));
+    }
+
     return 0;
 }
 
@@ -590,7 +678,6 @@ void init_patterns(void) {
 
 
 	/*ben adds*/
-    ADD_PATTERN(simplify_if_else);
     ADD_PATTERN(double_aload);
     ADD_PATTERN(double_iload);
 	ADD_PATTERN(double_astore);
@@ -604,10 +691,14 @@ void init_patterns(void) {
     ADD_PATTERN(negative_decrement);
     ADD_PATTERN(simplify_null_check);
     ADD_PATTERN(simplify_add_sub_right);
+    ADD_PATTERN(simplify_add_sub_left);
     ADD_PATTERN(simplify_division_right);
     ADD_PATTERN(simplify_multiplication_left);
     ADD_PATTERN(remove_extra_goto);
     ADD_PATTERN(simplify_putfield);
+    ADD_PATTERN(remove_extra_nop);
+    ADD_PATTERN(simplify_useless_comparison);
+
 
 	ADD_PATTERN(simplify_istore);
     /*
