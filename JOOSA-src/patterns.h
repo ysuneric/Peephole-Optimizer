@@ -502,6 +502,19 @@ int simplify_null_check(CODE **c){
     return 0;
 }
 
+/*
+ * if_icmpeq a || if_icmpne a || if_icmplt a || if_icmple a || if_icmpgt a || if_icmpge a || if_eg a || if_ne a
+ * ldc x (x = 0)
+ * goto b
+ * a1:
+ * ldc y (y = 1)
+ * b1:
+ * ifeq d
+ * ----->
+ * if_icmpne a || if_icmpeq a || if_icmpge a || if_icmpgt a || if_icmple a || if_icmplt a || if_ne a || if_eg a
+ *
+ */
+
 
 int simplify_useless_comparison(CODE **c){
     int x,y,a,a1,b,b1,d;
@@ -551,7 +564,6 @@ int simplify_useless_comparison(CODE **c){
 
 
 /*
- * Conversion extra nop line 793?
  *  ireturn
  *  nop
  *  ------>
