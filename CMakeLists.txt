@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(joos)
 
 set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_FLAGS "-Wall -ansi -pedantic -g")
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src)
 
@@ -14,6 +15,7 @@ find_package(FLEX REQUIRED)
 BISON_TARGET(
         Parser ${PROJECT_SOURCE_DIR}/JOOSA-src/joos.y
         ${CMAKE_CURRENT_BINARY_DIR}/src/y.tab.h
+        COMPILE_FLAGS "-y -d"
         DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/JOOSA-src/y.tab.c
 )
 FLEX_TARGET(
@@ -40,5 +42,5 @@ add_executable(
         JOOSA-src/tree.c
         ${BISON_Parser_OUTPUTS}
         ${FLEX_Scanner_OUTPUTS}
-        )
+)
 target_link_libraries( ${PROJECT_NAME} ${FLEX_LIBRARIES})

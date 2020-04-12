@@ -95,6 +95,25 @@ int simplify_goto_goto(CODE **c)
 
 /****************** GROUP CODE BELOW *********************/
 
+
+/*
+ * dup
+ * istore
+ * pop
+ * ----->
+ * istore
+ */
+int simplify_istore(CODE **c)
+{ int x;
+	if (is_dup(*c) &&
+		is_istore(next(*c),&x) &&
+		is_pop(nextby(*c,2))) {
+		return replace(c,3,makeCODEistore(x,NULL));
+	}
+	return 0;
+}
+
+
 /*  useless null replacements
 
  *  ifnull Label1 (unique?)
@@ -121,8 +140,8 @@ int simplify_goto_goto(CODE **c)
 */
 
 int simplify_null_check(CODE **c){
-    int x,y,a,b; //labels
-    int z; //constant
+    int x,y,a,b;
+    int z;
     char *str;
     if( //string
         is_ifnull(*c, &x) && uniquelabel(x) &&
@@ -590,7 +609,7 @@ void init_patterns(void) {
     ADD_PATTERN(remove_extra_goto);
     ADD_PATTERN(simplify_putfield);
 
-
+	ADD_PATTERN(simplify_istore);
     /*
  *
  *
