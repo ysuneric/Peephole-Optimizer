@@ -96,6 +96,33 @@ int simplify_goto_goto(CODE **c) {
 
 /****************** GROUP CODE BELOW *********************/
 
+
+/*
+ * new
+ * dup
+ * ldc
+ * invoke
+ * aload
+ * swap
+ * ------>
+ * aload
+ * new
+ * dup
+ * ldc
+ * invoke
+ *
+ * soundness: arguments are the same, no stack difference
+ */
+int simplify_swap_invoke(CODE **c) {
+	char *arg1, *arg2;
+	int x, y;
+	if (is_new(*c, &arg1) && is_dup(next(*c)) && is_ldc_int(nextby(*c, 2), &x) &&
+		is_invokenonvirtual(nextby(*c, 3), &arg2) && is_aload(nextby(*c, 4), &y) && is_swap(nextby(*c, 5))) {
+		return replace(c, 6, makeCODEaload(y, makeCODEnew(arg1, makeCODEdup(makeCODEldc_int(x, makeCODEinvokenonvirtual(arg2, NULL))))));
+	}
+	return 0;
+}
+
 /*helper for collapse verification, reduce code duplication function*/
 int collapse_satisfied(CODE **c, int label1) {
 	int x, y, label2, label3;
@@ -105,10 +132,27 @@ int collapse_satisfied(CODE **c, int label1) {
 }
 
 /*
+ * control_flow Label1     	control_flow Label1
+ * iconst 0					iconst 0
+ * goto Label2				goto Label2
+ * Label1					Label1
+ * iconst 1					iconst 1
+ * Label2					Label2
+ * dup						dup
+ * ifeq Label3				ifne Label3
+ * pop						pop
+ * ---->					------>
+ * control_flow Label1		opposite_control_flow label1
+ * load 0					load 1
+ * goto Label3				goto Label3
+ * Label1					Label1
  *
+ * The control flow logic is the same, if control flow is true or false we load a 1 or 0 respectively. duplicaate that value
+ * and then check for eq/ne. in the optimized expression, we first jump if the control flow is not satisfied, then load
+ * 1/0 depending on the original ifne vs ifeq. strictly smaller instrution set and stack is unchanged.
  */
 int collapse_local_branching_with_dup(CODE **c) {
-	int x, y, label, label1, label2, label3, label4, label5;
+	int label, label1, label2;
 
 	/*ifeq initial branch*/
 	if (is_ifeq(*c, &label1) && uniquelabel(label1)) {
@@ -173,11 +217,13 @@ int collapse_local_branching_with_dup(CODE **c) {
 		if (collapse_satisfied(c, label1)) {
 			is_goto(nextby(*c, 2), &label);
 			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEif_acmpeq(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																													 NULL)))));
+				return replace(c, 9,
+							   makeCODEif_acmpeq(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+																											   NULL)))));
 			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEif_acmpne(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																													 NULL)))));
+				return replace(c, 9,
+							   makeCODEif_acmpne(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+																											   NULL)))));
 			}
 		}
 	}
@@ -186,11 +232,13 @@ int collapse_local_branching_with_dup(CODE **c) {
 		if (collapse_satisfied(c, label1)) {
 			is_goto(nextby(*c, 2), &label);
 			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEif_acmpne(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																													 NULL)))));
+				return replace(c, 9,
+							   makeCODEif_acmpne(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+																											   NULL)))));
 			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEif_acmpeq(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																													 NULL)))));
+				return replace(c, 9,
+							   makeCODEif_acmpeq(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+																											   NULL)))));
 			}
 		}
 	}
@@ -199,11 +247,13 @@ int collapse_local_branching_with_dup(CODE **c) {
 		if (collapse_satisfied(c, label1)) {
 			is_goto(nextby(*c, 2), &label);
 			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEif_icmpeq(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																												NULL)))));
+				return replace(c, 9,
+							   makeCODEif_icmpeq(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+																											   NULL)))));
 			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEif_icmpne(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																												NULL)))));
+				return replace(c, 9,
+							   makeCODEif_icmpne(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+																											   NULL)))));
 			}
 		}
 	}
@@ -212,11 +262,13 @@ int collapse_local_branching_with_dup(CODE **c) {
 		if (collapse_satisfied(c, label1)) {
 			is_goto(nextby(*c, 2), &label);
 			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEif_icmpne(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																												NULL)))));
+				return replace(c, 9,
+							   makeCODEif_icmpne(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+																											   NULL)))));
 			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEif_icmpeq(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																												NULL)))));
+				return replace(c, 9,
+							   makeCODEif_icmpeq(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+																											   NULL)))));
 			}
 		}
 	}
@@ -226,11 +278,13 @@ int collapse_local_branching_with_dup(CODE **c) {
 		if (collapse_satisfied(c, label1)) {
 			is_goto(nextby(*c, 2), &label);
 			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEif_icmpgt(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																													 NULL)))));
+				return replace(c, 9,
+							   makeCODEif_icmpgt(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+																											   NULL)))));
 			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEif_icmple(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																													 NULL)))));
+				return replace(c, 9,
+							   makeCODEif_icmple(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+																											   NULL)))));
 			}
 		}
 	}
@@ -240,11 +294,13 @@ int collapse_local_branching_with_dup(CODE **c) {
 		if (collapse_satisfied(c, label1)) {
 			is_goto(nextby(*c, 2), &label);
 			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEif_icmplt(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																													 NULL)))));
+				return replace(c, 9,
+							   makeCODEif_icmplt(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+																											   NULL)))));
 			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEif_icmpge(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																													 NULL)))));
+				return replace(c, 9,
+							   makeCODEif_icmpge(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+																											   NULL)))));
 			}
 		}
 	}
@@ -254,11 +310,13 @@ int collapse_local_branching_with_dup(CODE **c) {
 		if (collapse_satisfied(c, label1)) {
 			is_goto(nextby(*c, 2), &label);
 			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEif_icmpge(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																													 NULL)))));
+				return replace(c, 9,
+							   makeCODEif_icmpge(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+																											   NULL)))));
 			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEif_icmplt(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																													 NULL)))));
+				return replace(c, 9,
+							   makeCODEif_icmplt(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+																											   NULL)))));
 			}
 		}
 	}
@@ -268,11 +326,13 @@ int collapse_local_branching_with_dup(CODE **c) {
 		if (collapse_satisfied(c, label1)) {
 			is_goto(nextby(*c, 2), &label);
 			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEif_icmple(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																													 NULL)))));
+				return replace(c, 9,
+							   makeCODEif_icmple(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+																											   NULL)))));
 			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEif_icmpgt(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																													 NULL)))));
+				return replace(c, 9,
+							   makeCODEif_icmpgt(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+																											   NULL)))));
 			}
 		}
 	}
@@ -284,6 +344,14 @@ int collapse_local_branching_with_dup(CODE **c) {
  * if icmpeq    if icmpne
  * ---->        --->
  * ifeq         ifne
+ *
+ * soundness:
+ * [...:x]
+ * [...: x: 0]
+ * [...]
+ * ------> works since ifeq/ifne compare to zero already
+ * [...:x]
+ * [...]
  */
 int simplify_cmpeq_cmpneq(CODE **c) {
 	int x, y;
@@ -302,6 +370,9 @@ int simplify_cmpeq_cmpneq(CODE **c) {
  * goto        goto
  * ---->       ----->
  * ireturn     areturn
+ *
+ * soundness:
+ * goto never reached, strictly decreasing
  */
 int simplify_return_goto(CODE **c) {
 	int x;
@@ -317,6 +388,7 @@ int simplify_return_goto(CODE **c) {
  * astore    istore
  * ---->     ------>
  *
+ * soundness: no change to overall computation.
  */
 int simplify_load_store(CODE **c) {
 	int x, y;
@@ -332,11 +404,12 @@ int simplify_load_store(CODE **c) {
  * swap
  * swap
  * ---->
- * swap
+ *
+ * soundness: swap + swap = no change on stack
  */
 int simplify_double_swap(CODE **c) {
 	if (is_swap(*c) && is_swap(next(*c))) {
-		return replace(c, 2, makeCODEswap(NULL));
+		return replace(c, 2, NULL);
 	}
 	return 0;
 }
@@ -347,6 +420,17 @@ int simplify_double_swap(CODE **c) {
  * pop
  * ----->
  * istore
+ *
+ * soundness:
+ * [...: x]
+ * [... : x : x] dup
+ * [... : x ] store
+ * [...] pop
+ * ---->
+ * [...: x]
+ * [...] istore
+ *
+ * start and end stack same, strictly decreasing, no hcange in computation.
  */
 int simplify_istore(CODE **c) {
 	int x;
@@ -945,4 +1029,5 @@ void init_patterns(void) {
 	ADD_PATTERN(simplify_return_goto);
 	ADD_PATTERN(simplify_cmpeq_cmpneq);
 	ADD_PATTERN(collapse_local_branching_with_dup);
+	ADD_PATTERN(simplify_swap_invoke);
 }
