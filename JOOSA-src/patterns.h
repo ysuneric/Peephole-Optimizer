@@ -420,12 +420,28 @@ int simplify_istore(CODE **c) {
  * pop
  * ldc x        (Integer or string)
  * L2:
-
+ *
+ * Soundness:
+ *
+ *
  * ldc x
  * dup
  * ifnull L
  * --------->
  * ldc x
+ *
+ * Soundness:
+ * [...: x] ldc x
+ * [... : x : x] dup
+ * [... : x ] ifnull L
+ * [... : x ]
+ * ---->
+ * [... : x] ldc x
+ * [... : x]
+ * This is a redundant dup and check for a jump that will never occur,
+ * therefore the flow control is the same and the stack continues forward the same.
+ * The stack height is purely decreasing.
+ *
  */
 
 int simplify_null_check(CODE **c) {
@@ -476,6 +492,10 @@ int simplify_null_check(CODE **c) {
  * ----->
  * if_icmpne a || if_icmpeq a || if_icmpge a || if_icmpgt a || if_icmple a || if_icmplt a || if_ne a || if_eg a
  *
+ * Soundness:
+ * The control flow logic is the same, if control flow is true or false we load a 1 or 0 respectively. We jump labels and check for eq.
+ * in the optimized expression, we flip the control flow to continue if the original check was false or jump if true.
+ * strictly smaller instruction set and stack is unchanged.
  *
  */
 int simplify_useless_comparison(CODE **c) {
