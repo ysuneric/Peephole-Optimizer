@@ -18,7 +18,6 @@
  *                               dup
  *                               iadd
  */
-
 int simplify_multiplication_right(CODE **c) {
 	int x, k;
 	if (is_iload(*c, &x) &&
@@ -95,6 +94,38 @@ int simplify_goto_goto(CODE **c) {
 }
 
 /****************** GROUP CODE BELOW *********************/
+/******************* Group 02 - 2020 *********************/
+/***** Eric Sun, Ben Ruddock, Emmanuel Mennesson *********/
+
+/*
+ * label with no inpaths
+ * soundness:
+ * dead label does not affect logic
+ */
+int remove_dead_label(CODE **c) {
+	int x;
+	if (is_label(*c, &x)) {
+		if (deadlabel(x)) return replace_modified(c, 1, NULL);
+	}
+	return 0;
+}
+
+/*
+ * Label1:
+ * Label1:
+ * ----->
+ * Label1:
+ *
+ * soundness:
+ * double labels in places do not affect logic, removing one is the same as keeping both, strictly decreasing
+ */
+int remove_duplicate_label(CODE **c) {
+	int x, y;
+	if (is_label(*c, &x) && is_label(next(*c), &y)) {
+		if (x == y) return replace_modified(c, 2, makeCODElabel(x, NULL));
+	}
+	return 0;
+}
 
 /*
  * new
@@ -345,7 +376,6 @@ int simplify_cmpeq_cmpneq(CODE **c) {
 	return 0;
 }
 
-
 /*
  * aload     iload
  * astore    istore
@@ -405,7 +435,6 @@ int simplify_istore(CODE **c) {
 	return 0;
 }
 
-
 /*  useless null replacements
  *  ifnull Label1 (unique?)
  *  goto Label2
@@ -413,16 +442,15 @@ int simplify_istore(CODE **c) {
  *  pop
  *  ldc "null" (string, may be an int)
  *  Label2
- *
  *  ----->
- *
- *  ifnonnull L2
+ * ifnonnull L2
  * pop
  * ldc x        (Integer or string)
  * L2:
  *
  * Soundness:
- *
+ * stack is smaller, logic is the same as,previous, instead of checking for null first, we check for nonnull first, and
+ * branch as needed, otherwise we just continue with code. strictly less instructions.
  *
  * ldc x
  * dup
@@ -438,12 +466,11 @@ int simplify_istore(CODE **c) {
  * ---->
  * [... : x] ldc x
  * [... : x]
- * This is a redundant dup and check for a jump that will never occur,
+ * This is a redundant dup and check for a jump that will never occur (ldc never loads null element)
  * therefore the flow control is the same and the stack continues forward the same.
- * The stack height is purely decreasing.
+ * The stack height is purely decreasing. and start end stack unchanged.
  *
  */
-
 int simplify_null_check(CODE **c) {
 	int x, y, a, b;
 	int z;
@@ -471,12 +498,12 @@ int simplify_null_check(CODE **c) {
 	if (is_ldc_int(*c, &x) &&
 		is_dup(next(*c)) &&
 		is_ifnull(next(next(*c)), &a)) {
-		return replace(c, 3, makeCODEldc_int(x, NULL));
+		return replace_modified(c, 3, makeCODEldc_int(x, NULL));
 	}
 	if (is_ldc_string(*c, &str) &&
 		is_dup(next(*c)) &&
 		is_ifnull(next(next(*c)), &a)) {
-		return replace(c, 3, makeCODEldc_string(str, NULL));
+		return replace_modified(c, 3, makeCODEldc_string(str, NULL));
 	}
 	return 0;
 }
@@ -1034,4 +1061,6 @@ void init_patterns(void) {
 	ADD_PATTERN(simplify_cmpeq_cmpneq);
 	ADD_PATTERN(collapse_usless_comparison_with_dup);
 	ADD_PATTERN(simplify_swap_invoke);
+	ADD_PATTERN(remove_duplicate_label);
+	ADD_PATTERN(remove_dead_label);
 }
