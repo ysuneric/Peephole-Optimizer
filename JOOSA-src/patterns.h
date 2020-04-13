@@ -151,191 +151,171 @@ int collapse_satisfied(CODE **c, int label1) {
  * and then check for eq/ne. in the optimized expression, we first jump if the control flow is not satisfied, then load
  * 1/0 depending on the original ifne vs ifeq. strictly smaller instrution set and stack is unchanged.
  */
-int collapse_local_branching_with_dup(CODE **c) {
+int collapse_usless_comparison_with_dup(CODE **c) {
 	int label, label1, label2;
 
-	/*ifeq initial branch*/
-	if (is_ifeq(*c, &label1) && uniquelabel(label1)) {
-		if (collapse_satisfied(c, label1)) {
-			is_goto(nextby(*c, 2), &label);
-			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEifeq(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																												NULL)))));
-			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEifne(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																												NULL)))));
-			}
-		}
-	}
-	/*ifne initial branch*/
-	if (is_ifne(*c, &label1) && uniquelabel(label1)) {
-		if (collapse_satisfied(c, label1)) {
-			is_goto(nextby(*c, 2), &label);
-			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEifne(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																												NULL)))));
-			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEifeq(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																												NULL)))));
-			}
-		}
-	}
+    int check = 0;
+    if(is_ifeq(*c, &label1)){
+        check = 1;
+    } else if(is_ifne(*c, &label1)){
+        check = 2;
+    } else if(is_ifnull(*c, &label1)){
+        check = 3;
+    } else if(is_ifnonnull(*c, &label1)){
+        check = 4;
+    } else if(is_if_acmpeq(*c, &label1)){
+        check = 5;
+    } else if(is_if_acmpne(*c, &label1)){
+        check = 6;
+    } else if(is_if_icmpeq(*c, &label1)){
+        check = 7;
+    } else if(is_if_icmpne(*c, &label1)) {
+        check = 8;
+    } else if(is_if_icmpgt(*c, &label1)){
+        check = 9;
+    } else if(is_if_icmplt(*c, &label1)){
+        check = 10;
+    } else if(is_if_icmpge(*c, &label1)){
+        check = 11;
+    } else if(is_if_icmple(*c, &label1)){
+        check = 12;
+    }
 
-	/* ifnull initial branch */
-	if (is_ifnull(*c, &label1) && uniquelabel(label1)) {
-		if (collapse_satisfied(c, label1)) {
-			is_goto(nextby(*c, 2), &label);
-			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEifnull(label1, makeCODEldc_int(0, makeCODEgoto(label2,
-																							makeCODElabel(label1,
-																										  NULL)))));
-			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEifnonnull(label1, makeCODEldc_int(1, makeCODEgoto(label2,
-																							   makeCODElabel(label1,
-																											 NULL)))));
-			}
-		}
-	}
-	/*ifnonnull initial branch*/
-	if (is_ifnull(*c, &label1) && uniquelabel(label1)) {
-		if (collapse_satisfied(c, label1)) {
-			is_goto(nextby(*c, 2), &label);
-			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEifnonnull(label1, makeCODEldc_int(0, makeCODEgoto(label2,
-																							   makeCODElabel(label1,
-																											 NULL)))));
-			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9, makeCODEifnull(label1, makeCODEldc_int(1, makeCODEgoto(label2,
-																							makeCODElabel(label1,
-																										  NULL)))));
-			}
-		}
-	}
+    if(check != 0 && collapse_satisfied(c, label1) && uniquelabel(label1)){
+        is_goto(nextby(*c, 2), &label);
+        switch(check){
+            case 1: /*ifeq initial branch*/
+                if (is_ifeq(nextby(*c, 7), &label2)) {
+                    return replace(c, 9, makeCODEifeq(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                    NULL)))));
+                } else if (is_ifne(nextby(*c, 7), &label2)) {
+                    return replace(c, 9, makeCODEifne(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                    NULL)))));
+                }
+                break;
+            case 2: /*ifne initial branch*/
+                if (is_ifeq(nextby(*c, 7), &label2)) {
+                    return replace(c, 9, makeCODEifne(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                    NULL)))));
+                } else if (is_ifne(nextby(*c, 7), &label2)) {
+                    return replace(c, 9, makeCODEifeq(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                    NULL)))));
+                }
+                break;
+            case 3: /* ifnull initial branch */
+                if (is_ifeq(nextby(*c, 7), &label2)) {
+                    return replace(c, 9, makeCODEifnull(label1, makeCODEldc_int(0, makeCODEgoto(label2,
+                                                                                                makeCODElabel(label1,
+                                                                                                              NULL)))));
+                } else if (is_ifne(nextby(*c, 7), &label2)) {
+                    return replace(c, 9, makeCODEifnonnull(label1, makeCODEldc_int(1, makeCODEgoto(label2,
+                                                                                                   makeCODElabel(label1,
+                                                                                                                 NULL)))));
+                }
+                break;
+            case 4: /*ifnonnull initial branch*/
+                if (is_ifeq(nextby(*c, 7), &label2)) {
+                    return replace(c, 9, makeCODEifnonnull(label1, makeCODEldc_int(0, makeCODEgoto(label2,
+                                                                                                   makeCODElabel(label1,
+                                                                                                                 NULL)))));
+                } else if (is_ifne(nextby(*c, 7), &label2)) {
+                    return replace(c, 9, makeCODEifnull(label1, makeCODEldc_int(1, makeCODEgoto(label2,
+                                                                                                makeCODElabel(label1,
+                                                                                                              NULL)))));
+                }
+                break;
+            case 5: /*if acmpeq initial branch*/
+                if (is_ifeq(nextby(*c, 7), &label2)) {
+                    return replace(c, 9,
+                                   makeCODEif_acmpeq(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                   NULL)))));
+                } else if (is_ifne(nextby(*c, 7), &label2)) {
+                    return replace(c, 9,
+                                   makeCODEif_acmpne(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                   NULL)))));
+                }
+                break;
+            case 6: /*if acmpne initial branch*/
+                if (is_ifeq(nextby(*c, 7), &label2)) {
+                    return replace(c, 9,
+                                   makeCODEif_acmpne(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                   NULL)))));
+                } else if (is_ifne(nextby(*c, 7), &label2)) {
+                    return replace(c, 9,
+                                   makeCODEif_acmpeq(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                   NULL)))));
+                }
+                break;
+            case 7: /*ificmpeq initial branch*/
+                if (is_ifeq(nextby(*c, 7), &label2)) {
+                    return replace(c, 9,
+                                   makeCODEif_icmpeq(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                   NULL)))));
+                } else if (is_ifne(nextby(*c, 7), &label2)) {
+                    return replace(c, 9,
+                                   makeCODEif_icmpne(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                   NULL)))));
+                }
+                break;
+            case 8: /*ificmpne initial branch*/
+                if (is_ifeq(nextby(*c, 7), &label2)) {
+                    return replace(c, 9,
+                                   makeCODEif_icmpne(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                   NULL)))));
+                } else if (is_ifne(nextby(*c, 7), &label2)) {
+                    return replace(c, 9,
+                                   makeCODEif_icmpeq(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                   NULL)))));
+                }
+                break;
+            case 9: /*if icmpgt initial branch*/
+                if (is_ifeq(nextby(*c, 7), &label2)) {
+                    return replace(c, 9,
+                                   makeCODEif_icmpgt(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                   NULL)))));
+                } else if (is_ifne(nextby(*c, 7), &label2)) {
+                    return replace(c, 9,
+                                   makeCODEif_icmple(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                   NULL)))));
+                }
+                break;
+            case 10: /*if icmplt initial branch*/
+                if (is_ifeq(nextby(*c, 7), &label2)) {
+                    return replace(c, 9,
+                                   makeCODEif_icmplt(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                   NULL)))));
+                } else if (is_ifne(nextby(*c, 7), &label2)) {
+                    return replace(c, 9,
+                                   makeCODEif_icmpge(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                   NULL)))));
+                }
+                break;
+            case 11: /*if icmpge initial branch*/
+                if (is_ifeq(nextby(*c, 7), &label2)) {
+                    return replace(c, 9,
+                                   makeCODEif_icmpge(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                   NULL)))));
+                } else if (is_ifne(nextby(*c, 7), &label2)) {
+                    return replace(c, 9,
+                                   makeCODEif_icmplt(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                   NULL)))));
+                }
+                break;
+            case 12: /*if icmple initial branch*/
+                if (is_ifeq(nextby(*c, 7), &label2)) {
+                    return replace(c, 9,
+                                   makeCODEif_icmple(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                   NULL)))));
+                } else if (is_ifne(nextby(*c, 7), &label2)) {
+                    return replace(c, 9,
+                                   makeCODEif_icmpgt(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
+                                                                                                                   NULL)))));
+                }
+                break;
 
-	/*if acmpeq initial branch*/
-	if (is_if_acmpeq(*c, &label1) && uniquelabel(label1)) {
-		if (collapse_satisfied(c, label1)) {
-			is_goto(nextby(*c, 2), &label);
-			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9,
-							   makeCODEif_acmpeq(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																											   NULL)))));
-			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9,
-							   makeCODEif_acmpne(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																											   NULL)))));
-			}
-		}
-	}
-	/*if acmpne initial branch*/
-	if (is_if_acmpne(*c, &label1) && uniquelabel(label1)) {
-		if (collapse_satisfied(c, label1)) {
-			is_goto(nextby(*c, 2), &label);
-			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9,
-							   makeCODEif_acmpne(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																											   NULL)))));
-			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9,
-							   makeCODEif_acmpeq(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																											   NULL)))));
-			}
-		}
-	}
-	/*ificmpeq initial branch*/
-	if (is_if_icmpeq(*c, &label1) && uniquelabel(label1)) {
-		if (collapse_satisfied(c, label1)) {
-			is_goto(nextby(*c, 2), &label);
-			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9,
-							   makeCODEif_icmpeq(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																											   NULL)))));
-			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9,
-							   makeCODEif_icmpne(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																											   NULL)))));
-			}
-		}
-	}
-	/*ificmpne initial branch*/
-	if (is_if_icmpne(*c, &label1) && uniquelabel(label1)) {
-		if (collapse_satisfied(c, label1)) {
-			is_goto(nextby(*c, 2), &label);
-			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9,
-							   makeCODEif_icmpne(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																											   NULL)))));
-			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9,
-							   makeCODEif_icmpeq(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																											   NULL)))));
-			}
-		}
-	}
+        }
+    }
 
-	/*if icmpgt initial branch*/
-	if (is_if_icmpgt(*c, &label1) && uniquelabel(label1)) {
-		if (collapse_satisfied(c, label1)) {
-			is_goto(nextby(*c, 2), &label);
-			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9,
-							   makeCODEif_icmpgt(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																											   NULL)))));
-			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9,
-							   makeCODEif_icmple(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																											   NULL)))));
-			}
-		}
-	}
-
-	/*if icmplt initial branch*/
-	if (is_if_icmplt(*c, &label1) && uniquelabel(label1)) {
-		if (collapse_satisfied(c, label1)) {
-			is_goto(nextby(*c, 2), &label);
-			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9,
-							   makeCODEif_icmplt(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																											   NULL)))));
-			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9,
-							   makeCODEif_icmpge(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																											   NULL)))));
-			}
-		}
-	}
-
-	/*if icmpge initial branch*/
-	if (is_if_icmpge(*c, &label1) && uniquelabel(label1)) {
-		if (collapse_satisfied(c, label1)) {
-			is_goto(nextby(*c, 2), &label);
-			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9,
-							   makeCODEif_icmpge(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																											   NULL)))));
-			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9,
-							   makeCODEif_icmplt(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																											   NULL)))));
-			}
-		}
-	}
-
-	/*if icmple initial branch*/
-	if (is_if_icmple(*c, &label1) && uniquelabel(label1)) {
-		if (collapse_satisfied(c, label1)) {
-			is_goto(nextby(*c, 2), &label);
-			if (is_ifeq(nextby(*c, 7), &label2)) {
-				return replace(c, 9,
-							   makeCODEif_icmple(label1, makeCODEldc_int(0, makeCODEgoto(label2, makeCODElabel(label1,
-																											   NULL)))));
-			} else if (is_ifne(nextby(*c, 7), &label2)) {
-				return replace(c, 9,
-							   makeCODEif_icmpgt(label1, makeCODEldc_int(1, makeCODEgoto(label2, makeCODElabel(label1,
-																											   NULL)))));
-			}
-		}
-	}
 	return 0;
 }
 
@@ -365,23 +345,6 @@ int simplify_cmpeq_cmpneq(CODE **c) {
 	return 0;
 }
 
-/*
- * ireturn     areturn
- * goto        goto
- * ---->       ----->
- * ireturn     areturn
- *
- * soundness:
- * goto never reached, strictly decreasing
- */
-int simplify_return_goto(CODE **c) {
-	int x;
-	if ((is_areturn(*c) || is_ireturn(*c)) && is_goto(next(*c), &x)) {
-		droplabel(x);
-		return replace(c, 2, makeCODEareturn(NULL));
-	}
-	return 0;
-}
 
 /*
  * aload     iload
@@ -588,12 +551,14 @@ int remove_extra_nop(CODE **c)
 
 
 /*
- *  return
+ *   *  a/ireturn
  *  goto start_4
  *
  *  ------>
  *
- *  areturn
+ *  a/ireturn
+ *
+ *  soundness: goto never reached, strictly decreasing
  */
 
 int remove_extra_goto(CODE **c) {
@@ -1038,8 +1003,7 @@ void init_patterns(void) {
 	ADD_PATTERN(simplify_istore);
 	ADD_PATTERN(simplify_double_swap);
 	ADD_PATTERN(simplify_load_store);
-	ADD_PATTERN(simplify_return_goto);
 	ADD_PATTERN(simplify_cmpeq_cmpneq);
-	ADD_PATTERN(collapse_local_branching_with_dup);
+	ADD_PATTERN(collapse_usless_comparison_with_dup);
 	ADD_PATTERN(simplify_swap_invoke);
 }
