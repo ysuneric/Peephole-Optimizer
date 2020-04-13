@@ -96,7 +96,6 @@ int simplify_goto_goto(CODE **c) {
 
 /****************** GROUP CODE BELOW *********************/
 
-
 /*
  * new
  * dup
@@ -118,7 +117,8 @@ int simplify_swap_invoke(CODE **c) {
 	int x, y;
 	if (is_new(*c, &arg1) && is_dup(next(*c)) && is_ldc_int(nextby(*c, 2), &x) &&
 		is_invokenonvirtual(nextby(*c, 3), &arg2) && is_aload(nextby(*c, 4), &y) && is_swap(nextby(*c, 5))) {
-		return replace(c, 6, makeCODEaload(y, makeCODEnew(arg1, makeCODEdup(makeCODEldc_int(x, makeCODEinvokenonvirtual(arg2, NULL))))));
+		return replace(c, 6, makeCODEaload(y, makeCODEnew(arg1, makeCODEdup(
+				makeCODEldc_int(x, makeCODEinvokenonvirtual(arg2, NULL))))));
 	}
 	return 0;
 }
@@ -420,49 +420,49 @@ int simplify_istore(CODE **c) {
  * pop
  * ldc x        (Integer or string)
  * L2:
- *
- *
- *
-* ldc x
-* dup
-* ifnull L
-* --------->
-* ldc x
-*/
 
-int simplify_null_check(CODE **c){
-    int x,y,a,b;
-    int z;
-    char *str;
-    if(
-        is_ifnull(*c, &x) && uniquelabel(x) &&
-        is_goto(next(*c), &y) &&
-        is_label(next(next(*c)), &a) &&
-        is_pop(next(next(next(*c)))) &&
-        is_ldc_string(next(next(next(next(*c)))),&str) &&
-        is_label(next(next(next(next(next(*c))))), &b)){
-        if(y == b && x == a) return replace(c, 5, makeCODEifnonnull(y,makeCODEpop(makeCODEldc_string(str, makeCODElabel(y,NULL)))));
-    }
-    if(
-            is_ifnull(*c, &x) && uniquelabel(x) &&
-            is_goto(next(*c), &y) &&
-            is_label(next(next(*c)), &a) &&
-            is_pop(next(next(next(*c)))) &&
-            is_ldc_int(next(next(next(next(*c)))),&z) &&
-            is_label(next(next(next(next(next(*c))))), &b)){
-        if(y == b && x == a) return replace(c, 5, makeCODEifnonnull(y,makeCODEpop(makeCODEldc_int(z, makeCODElabel(y,NULL)))));
-    }
-    if(is_ldc_int(*c, &x) &&
-        is_dup(next(*c)) &&
-        is_ifnull(next(next(*c)), &a)){
-        return replace(c, 3, makeCODEldc_int(x, NULL));
-    }
-    if(is_ldc_string(*c, &str) &&
-       is_dup(next(*c)) &&
-       is_ifnull(next(next(*c)), &a)){
-        return replace(c, 3, makeCODEldc_string(str, NULL));
-    }
-    return 0;
+ * ldc x
+ * dup
+ * ifnull L
+ * --------->
+ * ldc x
+ */
+
+int simplify_null_check(CODE **c) {
+	int x, y, a, b;
+	int z;
+	char *str;
+	if (
+			is_ifnull(*c, &x) && uniquelabel(x) &&
+			is_goto(next(*c), &y) &&
+			is_label(next(next(*c)), &a) &&
+			is_pop(next(next(next(*c)))) &&
+			is_ldc_string(next(next(next(next(*c)))), &str) &&
+			is_label(next(next(next(next(next(*c))))), &b)) {
+		if (y == b && x == a) return replace(c, 5, makeCODEifnonnull(y, makeCODEpop(
+					makeCODEldc_string(str, makeCODElabel(y, NULL)))));
+	}
+	if (
+			is_ifnull(*c, &x) && uniquelabel(x) &&
+			is_goto(next(*c), &y) &&
+			is_label(next(next(*c)), &a) &&
+			is_pop(next(next(next(*c)))) &&
+			is_ldc_int(next(next(next(next(*c)))), &z) &&
+			is_label(next(next(next(next(next(*c))))), &b)) {
+		if (y == b && x == a) return replace(c, 5, makeCODEifnonnull(y, makeCODEpop(
+					makeCODEldc_int(z, makeCODElabel(y, NULL)))));
+	}
+	if (is_ldc_int(*c, &x) &&
+		is_dup(next(*c)) &&
+		is_ifnull(next(next(*c)), &a)) {
+		return replace(c, 3, makeCODEldc_int(x, NULL));
+	}
+	if (is_ldc_string(*c, &str) &&
+		is_dup(next(*c)) &&
+		is_ifnull(next(next(*c)), &a)) {
+		return replace(c, 3, makeCODEldc_string(str, NULL));
+	}
+	return 0;
 }
 
 /*
@@ -476,55 +476,61 @@ int simplify_null_check(CODE **c){
  * ----->
  * if_icmpne a || if_icmpeq a || if_icmpge a || if_icmpgt a || if_icmple a || if_icmplt a || if_ne a || if_eg a
  *
+ *
  */
+int simplify_useless_comparison(CODE **c) {
+	int x, y, a, a1, b, b1, d;
+	int check = 0;
+	if (is_if_icmpeq(*c, &a)) {
+		check = 1;
+	} else if (is_if_icmpne(*c, &a)) {
+		check = 2;
+	} else if (is_if_icmplt(*c, &a)) {
+		check = 3;
+	} else if (is_if_icmple(*c, &a)) {
+		check = 4;
+	} else if (is_if_icmpgt(*c, &a)) {
+		check = 5;
+	} else if (is_if_icmpge(*c, &a)) {
+		check = 6;
+	} else if (is_ifeq(*c, &a)) {
+		check = 7;
+	} else if (is_ifne(*c, &a)) {
+		check = 8;
+	}
 
-
-int simplify_useless_comparison(CODE **c){
-    int x,y,a,a1,b,b1,d;
-    int check = 0;
-    if(is_if_icmpeq(*c, &a)){
-        check = 1;
-    } else if(is_if_icmpne(*c, &a)){
-        check = 2;
-    } else if(is_if_icmplt(*c, &a)){
-        check = 3;
-    } else if(is_if_icmple(*c, &a)){
-        check = 4;
-    } else if(is_if_icmpgt(*c, &a)){
-        check = 5;
-    } else if(is_if_icmpge(*c, &a)){
-        check = 6;
-    } else if(is_ifeq(*c, &a)){
-        check = 7;
-    } else if(is_ifne(*c, &a)){
-        check = 8;
-    }
-
-    if(check != 0 &&
-        is_ldc_int(next(*c), &x) &&
-        is_goto(next(next(*c)),&b) &&
-        is_label(next(next(next(*c))),&a1) &&
-        is_ldc_int(next(next(next(next(*c)))), &y) &&
-        is_label(next(next(next(next(next(*c))))),&b1) &&
-        is_ifeq(next(next(next(next(next(next(*c)))))), &d) &&
-        (x == 0 && y == 1 && a == a1 && b == b1) &&
-        uniquelabel(a) && uniquelabel(b)){
-        switch (check){
-            case 1: return(replace(c, 7,makeCODEif_icmpne(d,NULL)));
-            case 2: return(replace(c, 7,makeCODEif_icmpeq(d,NULL)));
-            case 3: return(replace(c, 7,makeCODEif_icmpge(d,NULL)));
-            case 4: return(replace(c, 7,makeCODEif_icmpgt(d,NULL)));
-            case 5: return(replace(c, 7,makeCODEif_icmple(d,NULL)));
-            case 6: return(replace(c, 7,makeCODEif_icmplt(d,NULL)));
-            case 7: return(replace(c, 7,makeCODEifne(d,NULL)));
-            case 8: return(replace(c, 7,makeCODEifeq(d,NULL)));
-            default: return 0;
-        }
-
-    }
-    return 0;
+	if (check != 0 &&
+		is_ldc_int(next(*c), &x) &&
+		is_goto(next(next(*c)), &b) &&
+		is_label(next(next(next(*c))), &a1) &&
+		is_ldc_int(next(next(next(next(*c)))), &y) &&
+		is_label(next(next(next(next(next(*c))))), &b1) &&
+		is_ifeq(next(next(next(next(next(next(*c)))))), &d) &&
+		(x == 0 && y == 1 && a == a1 && b == b1) &&
+		uniquelabel(a) && uniquelabel(b)) {
+		switch (check) {
+			case 1:
+				return (replace(c, 7, makeCODEif_icmpne(d, NULL)));
+			case 2:
+				return (replace(c, 7, makeCODEif_icmpeq(d, NULL)));
+			case 3:
+				return (replace(c, 7, makeCODEif_icmpge(d, NULL)));
+			case 4:
+				return (replace(c, 7, makeCODEif_icmpgt(d, NULL)));
+			case 5:
+				return (replace(c, 7, makeCODEif_icmple(d, NULL)));
+			case 6:
+				return (replace(c, 7, makeCODEif_icmplt(d, NULL)));
+			case 7:
+				return (replace(c, 7, makeCODEifne(d, NULL)));
+			case 8:
+				return (replace(c, 7, makeCODEifeq(d, NULL)));
+			default:
+				return 0;
+		}
+	}
+	return 0;
 }
-
 
 /*
  *  ireturn
@@ -538,17 +544,17 @@ int simplify_useless_comparison(CODE **c){
  *  nop
  *  ----->
  *  return
+ *
+ *  soundness: noop after return is never hit.
  */
+int remove_extra_nop(CODE **c) {
+	if ((is_ireturn(*c) || is_return(*c)) && is_nop(next(*c))) {
+		if (is_return(*c)) return replace(c, 2, makeCODEreturn(NULL));
+		else if (is_ireturn(*c)) return replace(c, 2, makeCODEireturn(NULL));
+	}
 
-int remove_extra_nop(CODE **c)
-{ if ((is_ireturn(*c) || is_return(*c)) && is_nop(next(*c))) {
-        if(is_return(*c)) return replace(c, 2, makeCODEreturn(NULL));
-        else if(is_ireturn(*c)) return replace(c, 2, makeCODEireturn(NULL));
-    }
-
-    return 0;
+	return 0;
 }
-
 
 /*
  *   *  a/ireturn
@@ -560,7 +566,6 @@ int remove_extra_nop(CODE **c)
  *
  *  soundness: goto never reached, strictly decreasing
  */
-
 int remove_extra_goto(CODE **c) {
 	int x;
 	if (is_areturn(*c) &&
@@ -574,7 +579,6 @@ int remove_extra_goto(CODE **c) {
 	return 0;
 }
 
-
 /*
  *  replace decrements with single line
  *  iload x
@@ -583,8 +587,9 @@ int remove_extra_goto(CODE **c) {
  *  istore x
  *  --------->
  *  iinc x k
+ *
+ *  soundness: strictly decreasing, and no stack changes. all increment and decrement have same reasoning
  */
-
 int negative_increment(CODE **c) {
 	int x, y, k;
 	if (is_iload(*c, &x) &&
@@ -602,17 +607,18 @@ int negative_increment(CODE **c) {
  * istore x
  * --------->
  * iinc x k
+ * soundness: strictly decreasing, and no stack changes. all increment and decrement have same reasoning
  */
-int positive_decrement(CODE **c)
-{ int x,y,k;
-    if (is_iload(*c,&x) &&
-        is_ldc_int(next(*c),&k) &&
-        is_isub(next(next(*c))) &&
-        is_istore(next(next(next(*c))),&y) &&
-        x==y && 0<=k && k<=128) {
-        return replace(c,4,makeCODEiinc(x,-k,NULL));
-    }
-    return 0;
+int positive_decrement(CODE **c) {
+	int x, y, k;
+	if (is_iload(*c, &x) &&
+		is_ldc_int(next(*c), &k) &&
+		is_isub(next(next(*c))) &&
+		is_istore(next(next(next(*c))), &y) &&
+		x == y && 0 <= k && k <= 128) {
+		return replace(c, 4, makeCODEiinc(x, -k, NULL));
+	}
+	return 0;
 }
 
 /* iload x
@@ -621,6 +627,7 @@ int positive_decrement(CODE **c)
  * istore x
  * --------->
  * iinc x k
+ * soundness: strictly decreasing, and no stack changes. all increment and decrement have same reasoning
  */
 int negative_decrement(CODE **c) {
 	int x, y, k;
@@ -642,9 +649,8 @@ int negative_decrement(CODE **c) {
  *
  * aload i
  * dup
- *
+ * soundness, no change to stack, strictly less bits
  */
-
 int double_aload(CODE **c) {
 	int x, y;
 	if (is_aload(*c, &x) &&
@@ -662,9 +668,8 @@ int double_aload(CODE **c) {
  *
  * aload i
  * dup
- *
+ * soundness: no change to stack ,strictly less bits
  */
-
 int double_iload(CODE **c) {
 	int x, y;
 	if (is_iload(*c, &x) &&
@@ -681,8 +686,9 @@ int double_iload(CODE **c) {
  * ---->
  *
  * istore i
+ *
+ * storing same value twice is useless, strictly less arguments
  */
-
 int double_istore(CODE **c) {
 	int x, y;
 	if (is_istore(*c, &x) &&
@@ -699,8 +705,8 @@ int double_istore(CODE **c) {
  * ---->
  *
  * astore i
+ * same as istore soundenss, useless extra operation
  */
-
 int double_astore(CODE **c) {
 	int x, y;
 	if (is_astore(*c, &x) &&
@@ -718,6 +724,8 @@ int double_astore(CODE **c) {
  *
  * dup
  * istore i
+ *
+ * strictly less bits, no change to stack
  */
 int i_store_load(CODE **c) {
 	int x, y;
@@ -736,6 +744,8 @@ int i_store_load(CODE **c) {
 *
 * dup
 * istore i
+ *
+ * same as i store load, no change to stack strictly less bits
 */
 int a_store_load(CODE **c) {
 	int x, y;
@@ -753,6 +763,8 @@ int a_store_load(CODE **c) {
  * ---->
  *
  * nothing
+ *
+ * load store does nothing in terms of computation, stricly smaller stack,
  */
 int load_store(CODE **c) {
 	int x, y, a, b;
@@ -778,9 +790,8 @@ int load_store(CODE **c) {
  * ------>        ------>
  * iload x        iload x
  *
- *
+ * simplifying mathematical invariants
  */
-
 int simplify_add_sub_right(CODE **c) {
 	int x, k;
 	if (is_iload(*c, &x) &&
@@ -788,16 +799,16 @@ int simplify_add_sub_right(CODE **c) {
 		(is_iadd(next(next(*c))) || is_isub(next(next(*c))))) {
 		if (k == 0) return replace(c, 3, makeCODEiload(x, NULL));
 
-        return 0;
-    }
-    if (is_ldc_int(*c,&x) &&
-        is_ldc_int(next(*c),&k) &&
-        (is_iadd(next(next(*c))) || is_isub(next(next(*c))))) {
-        if (k==0) return replace(c,3,makeCODEldc_int(x, NULL));
+		return 0;
+	}
+	if (is_ldc_int(*c, &x) &&
+		is_ldc_int(next(*c), &k) &&
+		(is_iadd(next(next(*c))) || is_isub(next(next(*c))))) {
+		if (k == 0) return replace(c, 3, makeCODEldc_int(x, NULL));
 
-        return 0;
-    }
-    return 0;
+		return 0;
+	}
+	return 0;
 }
 
 /* ldc 0        ldc 0
@@ -812,26 +823,25 @@ int simplify_add_sub_right(CODE **c) {
  * ------>        ------>
  * iload x        iload x
  *
- *
+ * more mathematical invariants
  */
+int simplify_add_sub_left(CODE **c) {
+	int x, k;
+	if (is_ldc_int(*c, &x) &&
+		is_iload(next(*c), &k) &&
+		(is_iadd(next(next(*c))) || is_isub(next(next(*c))))) {
+		if (k == 0) return replace(c, 3, makeCODEiload(x, NULL));
 
-int simplify_add_sub_left(CODE **c)
-{ int x,k;
-    if (is_ldc_int(*c,&x) &&
-        is_iload(next(*c),&k) &&
-        (is_iadd(next(next(*c))) || is_isub(next(next(*c))))) {
-        if (k==0) return replace(c,3,makeCODEiload(x, NULL));
+		return 0;
+	}
+	if (is_ldc_int(*c, &k) &&
+		is_ldc_int(next(*c), &x) &&
+		(is_iadd(next(next(*c))) || is_isub(next(next(*c))))) {
+		if (k == 0) return replace(c, 3, makeCODEldc_int(x, NULL));
 
-        return 0;
-    }
-    if (is_ldc_int(*c,&k) &&
-        is_ldc_int(next(*c),&x) &&
-        (is_iadd(next(next(*c))) || is_isub(next(next(*c))))) {
-        if (k==0) return replace(c,3,makeCODEldc_int(x, NULL));
-
-        return 0;
-    }
-    return 0;
+		return 0;
+	}
+	return 0;
 }
 
 /* iload x
@@ -846,22 +856,22 @@ int simplify_add_sub_left(CODE **c)
  * ------>
  * ldc x
  *
+ * more invariants
  */
+int simplify_division_right(CODE **c) {
+	int x, k;
+	if (is_iload(*c, &x) &&
+		is_ldc_int(next(*c), &k) &&
+		is_idiv(next(next(*c)))) {
+		if (k == 1) return replace(c, 3, makeCODEiload(x, NULL));
+	}
+	if (is_ldc_int(*c, &x) &&
+		is_ldc_int(next(*c), &k) &&
+		is_idiv(next(next(*c)))) {
+		if (k == 1) return replace(c, 3, makeCODEldc_int(x, NULL));
+	}
 
-int simplify_division_right(CODE **c)
-{ int x,k;
-    if (is_iload(*c,&x) &&
-        is_ldc_int(next(*c),&k) &&
-        is_idiv(next(next(*c)))) {
-        if (k==1) return replace(c,3,makeCODEiload(x,NULL));
-    }
-    if (is_ldc_int(*c,&x) &&
-        is_ldc_int(next(*c),&k) &&
-        is_idiv(next(next(*c)))) {
-        if (k==1) return replace(c,3,makeCODEldc_int(x,NULL));
-    }
-
-    return 0;
+	return 0;
 }
 
 /* ldc 0          ldc 0          ldc 2
@@ -871,8 +881,8 @@ int simplify_division_right(CODE **c)
  * ldc 0          iload x        iload x
  *                               dup
  *                               iadd
+ * more invariants
  */
-
 int simplify_multiplication_left(CODE **c) {
 	int x, k;
 	if (is_ldc_int(*c, &k) &&
@@ -889,7 +899,6 @@ int simplify_multiplication_left(CODE **c) {
 	return 0;
 }
 
-
 /*
  * consider strings
  *  ldc a / load a
@@ -900,8 +909,9 @@ int simplify_multiplication_left(CODE **c) {
  *
  *  ldc b / load b
  *  ldc a / load a
+ *
+ *  simplify swap, stack unchanged, fewer instructions
  */
-
 int load_load_swap(CODE **c) {
 	int x, y, a, b, i, j;
 	char *str1, *str2;
@@ -944,7 +954,6 @@ int load_load_swap(CODE **c) {
 	return 0;
 }
 
-
 /*
  * dup
  * aload 0
@@ -955,6 +964,8 @@ int load_load_swap(CODE **c) {
  * aload 0
  * swap
  * putfield
+ *
+ * simplify superfluous dup pop, instructions are the same, stack unchanged
  */
 int simplify_putfield(CODE **c) {
 	int x;
@@ -969,36 +980,33 @@ int simplify_putfield(CODE **c) {
 	return 0;
 }
 
-
 void init_patterns(void) {
 	ADD_PATTERN(simplify_multiplication_right);
 	ADD_PATTERN(simplify_astore);
 	ADD_PATTERN(positive_increment);
 	ADD_PATTERN(simplify_goto_goto);
 
-
 	/*ben adds*/
-    ADD_PATTERN(double_aload);
-    ADD_PATTERN(double_iload);
+	ADD_PATTERN(double_aload);
+	ADD_PATTERN(double_iload);
 	ADD_PATTERN(double_astore);
-    ADD_PATTERN(double_istore);
-    ADD_PATTERN(a_store_load);
-    ADD_PATTERN(i_store_load);
-    ADD_PATTERN(load_store);
-    ADD_PATTERN(load_load_swap);
-    ADD_PATTERN(negative_increment);
-    ADD_PATTERN(positive_decrement);
-    ADD_PATTERN(negative_decrement);
-    ADD_PATTERN(simplify_null_check);
-    ADD_PATTERN(simplify_add_sub_right);
-    ADD_PATTERN(simplify_add_sub_left);
-    ADD_PATTERN(simplify_division_right);
-    ADD_PATTERN(simplify_multiplication_left);
-    ADD_PATTERN(remove_extra_goto);
-    ADD_PATTERN(simplify_putfield);
-    ADD_PATTERN(remove_extra_nop);
-    ADD_PATTERN(simplify_useless_comparison);
-
+	ADD_PATTERN(double_istore);
+	ADD_PATTERN(a_store_load);
+	ADD_PATTERN(i_store_load);
+	ADD_PATTERN(load_store);
+	ADD_PATTERN(load_load_swap);
+	ADD_PATTERN(negative_increment);
+	ADD_PATTERN(positive_decrement);
+	ADD_PATTERN(negative_decrement);
+	ADD_PATTERN(simplify_null_check);
+	ADD_PATTERN(simplify_add_sub_right);
+	ADD_PATTERN(simplify_add_sub_left);
+	ADD_PATTERN(simplify_division_right);
+	ADD_PATTERN(simplify_multiplication_left);
+	ADD_PATTERN(remove_extra_goto);
+	ADD_PATTERN(simplify_putfield);
+	ADD_PATTERN(remove_extra_nop);
+	ADD_PATTERN(simplify_useless_comparison);
 
 	ADD_PATTERN(simplify_istore);
 	ADD_PATTERN(simplify_double_swap);
